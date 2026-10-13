@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Real Parallelism in Ruby with Ractors</title>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@6.0.2/dist/reset.css">
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@6.0.2/dist/reveal.css">
+    <link rel="stylesheet" href="styles/theme.css">
+    <link rel="stylesheet" href="https://unpkg.com/highlight.js@11.12.0/styles/github-dark.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "mermaid": "https://unpkg.com/mermaid@12.2.0/dist/mermaid.esm.min.mjs",
+          "reveal.js": "https://unpkg.com/reveal.js@6.0.2/dist/reveal.mjs",
+          "reveal.js-mermaid-plugin": "./scripts/mermaid-plugin.js",
+          "reveal.js-laser-pointer-plugin": "./scripts/laser-pointer-plugin.js",
+          "reveal.js-markdown-plugin": "https://unpkg.com/reveal.js@6.0.2/dist/plugin/markdown.mjs",
+          "reveal.js-highlight-plugin": "https://unpkg.com/reveal.js@6.0.2/dist/plugin/highlight.mjs",
+          "reveal.js-notes-plugin": "https://unpkg.com/reveal.js@6.0.2/dist/plugin/notes.mjs"
+        }
+      }
+    </script>
+  </head>
+  <style>
+    svg {
+      max-width: 800px !important;
+      max-height: 520px !important;
+      line-height: 150%;
+      -webkit-text-stroke-width: 0.01px;
+    }
+
+    img[alt="Gannon"] {
+      width: 40%;
+      float: left;
+    }
+
+
+    img[alt="Repo QR Code"] {
+      width: 50%;
+    }
+
+    .ractor-contributors {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4em;
+      max-width: 900px;
+      margin: 0.65em auto;
+    }
+
+    .ractor-contributor {
+      width: 89px;
+      color: var(--r-main-color);
+      font-size: 0.32em;
+      line-height: 1.2;
+    }
+
+    .ractor-contributor img {
+      display: block;
+      width: 79px;
+      height: 79px;
+      margin: 0 auto 0.25em;
+      border: 3px solid var(--r-accent-color);
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .ractor-contributor a {
+      color: inherit;
+    }
+
+    .ractor-contributor a:hover {
+      color: var(--r-accent-color);
+    }
+
+    .ractor-contributor a:focus-visible {
+      outline: 3px solid var(--r-accent-color);
+      outline-offset: 4px;
+    }
+
+
+    .reveal .slides > section:first-child h1 {
+      padding-top: 100px;
+      font-size: 2.6em;
+    }
+
+    .reveal .slides > section:first-child h1::after {
+      content: "";
+      display: block;
+      width: 0.9em;
+      height: 0.06em;
+      margin: 0.25em auto 0;
+      border-radius: 999px;
+      background: var(--r-accent-color);
+    }
+    .video-reference {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55em;
+      max-width: 1100px;
+      margin: 0.25em auto;
+    }
+
+    .video-reference__preview {
+      flex: 1 1 auto;
+    }
+
+    .video-reference__preview img {
+      display: block;
+      width: 100%;
+      max-width: 800px;
+      border: 3px solid var(--r-accent-color);
+      border-radius: 0.2em;
+    }
+
+    .video-reference__qr {
+      flex: 0 0 190px;
+      color: inherit;
+      font-size: 0.42em;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .video-reference__qr img {
+      display: block;
+      width: 100%;
+      margin-bottom: 0.25em;
+      padding: 8px;
+      background: white;
+    }
+
+    .video-reference__qr:hover {
+      color: var(--r-accent-color);
+    }
+
+    .video-reference__qr:focus-visible {
+      outline: 3px solid var(--r-accent-color);
+      outline-offset: 4px;
+    }
+    .template-reference {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75em;
+      max-width: 1100px;
+      margin: 0.3em auto;
+    }
+
+    .template-reference pre {
+      flex: 1 1 auto;
+      margin: 0;
+      text-align: left;
+    }
+
+    .template-reference__qr {
+      flex: 0 0 190px;
+      color: inherit;
+      font-size: 0.42em;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .template-reference__qr img {
+      display: block;
+      width: 100%;
+      margin-bottom: 0.25em;
+      padding: 8px;
+      background: white;
+    }
+
+    .template-reference__qr:hover {
+      color: var(--r-accent-color);
+    }
+
+    .template-reference__qr:focus-visible {
+      outline: 3px solid var(--r-accent-color);
+      outline-offset: 4px;
+    }
+
+
+    .article-references {
+      display: flex;
+      justify-content: center;
+      gap: 1em;
+      max-width: 900px;
+      margin: 0.7em auto;
+    }
+
+    .article-reference {
+      width: 320px;
+      color: inherit;
+      font-size: 0.42em;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .article-reference img {
+      display: block;
+      width: 220px;
+      margin: 0 auto 0.35em;
+      padding: 8px;
+      background: white;
+    }
+
+    .article-reference:hover {
+      color: var(--r-accent-color);
+    }
+
+    .article-reference:focus-visible {
+      outline: 3px solid var(--r-accent-color);
+      outline-offset: 4px;
+    }
+
+    .article-reference__title {
+      display: block;
+      font-weight: 700;
+    }
+
+    .article-reference__author {
+      display: block;
+      margin-top: 0.15em;
+    }
+
+
+  </style>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section data-markdown>
+          <textarea data-template>
+            # Real Parallelism in Ruby with Ractors
+
+            #### [Gannon McGibbon](https://gannon.io/)
+
+            Note:
+            - For WRUG October 2026
+            ---
+            ## 👋 Hi, I'm Gannon
+
+            ![Gannon](images/me.jpg)
+
+            <br>
+
+            - Developer at Shopify
+            - Committer on Rails
+            - Working on Ractors in Rails
+
+            Note:
+            - I'm a Staff Eng at Shopify
+            - Also a Committer on Rails
+            - Lately I've been working
+            - on Ractor support in Rails
+            - and want to talk about it
+            - *Pause*
+            ---
+            ## Agenda
+
+            - What is a Ractor
+            - Ractors vs Threads
+            - Ractors on Rails
+
+            Note:
+            - I'll be covering
+            - What a Ractor is
+            - How they compare to similar concepts like threads
+            - And how my team and I introduced Ractor support in Rails
+            - *Pause*
+            ---
+            # What is a Ractor
+
+            Note:
+            - Let's start with the basics
+            ---
+            ## What is a Ractor
+
+            - **R**uby **Actor**
+            - Introduced in Ruby 3.0 (2020)
+            - Designed by Koichi Sasada
+            - Still experimental in Ruby 4.0
+
+            Note:
+            - A Ractor is short for Ruby Actor
+            - An impl of the actor model pattern in Ruby
+            - Ractors are isolated units of execution
+            - that talk to each other with messages
+            - and share immutable data
+            ---
+            ## What is a Ractor
+
+            - **R**uby **Actor**
+            - Introduced in Ruby 3.0 (2020)
+            - Designed by Koichi Sasada
+            - Still experimental in Ruby 4.0
+
+            Note:
+            - They were made by Koichi Sasada
+            - of the Ruby Core team
+            - and they've been in Ruby for awhile now
+            - Since 2020
+            - And are still marked as experimental
+            ---
+            ## Ractors on other Ruby platforms
+
+            | Implementation | Ractors | Parallel Threads |
+            | -------------- | ------- | ---------------- |
+            | CRuby (MRI)    | Native  | No               |
+            | JRuby          | No      | Yes              |
+            | TruffleRuby    | No      | Yes              |
+
+            Note:
+            - Ractors are currently a CRuby feature
+            - JRuby and TruffleRuby do not implement them
+            - They already run normal Ruby threads in parallel
+            - So Ractor support isn't as necessary
+            ---
+            ## What is a Ractor
+
+            ```mermaid
+            timeline
+                title Ractor history
+                2020 : Ruby 3.0 ships Ractors as experimental
+                2021-2024 : Ruby 3.1 to 3.4 : main?, store_if_absent, bug fixes
+                2025 : Ruby 4.0 : Ports, shareable procs, value and join
+                2026 : Rails starts adopting Ractors
+            ```
+
+            Note:
+            - Here's a rough timeline of Ractor development
+            - Ruby 3 shipped experimental support in 2020
+            - 3.1-3.4 fixed bugs and added methods
+            - Ruby 4.0 shipped a fully featured API
+            ---
+            ## What is a Ractor
+
+            ```mermaid
+            timeline
+                title Ractor history
+                2020 : Ruby 3.0 ships Ractors as experimental
+                2021-2024 : Ruby 3.1 to 3.4 : main?, store_if_absent, bug fixes
+                2025 : Ruby 4.0 : Ports, shareable procs, value and join
+                2026 : Rails starts adopting Ractors
+            ```
+
+            Note:
+            - Ports
+            - Shareable procs and lambdas
+            - Value and join methods
+            - And a lot of stability and performance work
+            ---
+            ## What is a Ractor
+
+            ```mermaid
+            timeline
+                title Ractor history
+                2020 : Ruby 3.0 ships Ractors as experimental
+                2021-2024 : Ruby 3.1 to 3.4 : main?, store_if_absent, bug fixes
+                2025 : Ruby 4.0 : Ports, shareable procs, value and join
+                2026 : Rails starts adopting Ractors
+            ```
+
+            Note:
+            - In 2026
+            - My team and I started working
+            - on Ractor support in Rails
+            - *Pause*
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            ractor = Ractor.new { 20 * 2 }
+
+            ractor.join.value # => 40
+            ```
+
+            Note:
+            - This is what a Ractor looks like
+            - Ractor.new takes a block
+            - And runs the code
+            ---
+            ## What is a Ractor
+
+            ```rb[1]
+            ractor = Ractor.new { 20 * 2 }
+
+            ractor.join.value # => 40
+            ```
+
+            Note:
+            - In this case simple multiplication
+            - In a new Ractor
+            - With its own Global VM lock
+            - (GVL for short)
+            - Running in parallel
+            ---
+            ## What is a Ractor
+
+            ```rb[3]
+            ractor = Ractor.new { 20 * 2 }
+
+            ractor.join.value # => 40
+            ```
+
+            Note:
+            - Calling value waits for
+            - the Ractor to finish
+            - And hands us back the result
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            thread = Thread.new { 20 * 2 }
+
+            thread.join.value # => 40
+            ```
+
+            Note:
+            - You can actually use
+            - The exact same APIs
+            - With threads in Ruby
+            - We'll talk more about threads later
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            a = 1
+
+            Ractor.new { puts a }
+            # ArgumentError: can not isolate a Proc
+            #   because it accesses outer variables (a).
+            ```
+
+            Note:
+            - For now
+            - Here's where ractors differ from threads
+            - The passed block is isolated
+            - It can't see outer scoped variables
+            - Ruby raises when you try to use them
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            a = 1
+
+            Ractor.new(a) { |a| puts a }.join
+            # 1
+            ```
+
+            Note:
+            - If you want to use something from an outer scope
+            - You can pass it in explicitly
+            - Arguments of Ractor.new become block arguments
+            - And may be referenced at that point
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            ractor = Ractor.new do
+              message = Ractor.receive
+              "#{message} world"
+            end
+
+            ractor.send("hello")
+            ractor.value # => "hello world"
+            ```
+
+            Note:
+            - Ractors can also pass messages
+            - Via the port API
+            - Every Ractor has a mailbox
+            - Which can be used to do this exchange
+            ---
+            ## What is a Ractor
+
+            ```rb[6]
+            ractor = Ractor.new do
+              message = Ractor.receive
+              "#{message} world"
+            end
+
+            ractor.send("hello")
+            ractor.value # => "hello world"
+            ```
+
+            Note:
+            - Send puts a message in the box
+            - In this case, a hello string
+            ---
+            ## What is a Ractor
+
+            ```rb[2]
+            ractor = Ractor.new do
+              message = Ractor.receive
+              "#{message} world"
+            end
+
+            ractor.send("hello")
+            ractor.value # => "hello world"
+            ```
+
+            Note:
+            - Receive blocks until something is sent
+            - So this Ractor won't fully run
+            - Until the hello string is sent
+            ---
+            ## What is a Ractor
+
+            ```rb[3,7]
+            ractor = Ractor.new do
+              message = Ractor.receive
+              "#{message} world"
+            end
+
+            ractor.send("hello")
+            ractor.value # => "hello world"
+            ```
+
+            Note:
+            - And when it is
+            - The value is interpolated
+            - We get the result back
+            - And can use it how we want
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            port = Ractor::Port.new
+
+            ractor = Ractor.new(port) do |port|
+              port.send(:start)
+              Ractor.receive
+            end
+
+            port.receive # => :start
+            ractor.send(:end)
+            ractor.value # => :end
+            ```
+
+            Note:
+            - Mailboxes can also be made separately
+            - Via the Port class
+            - Anyone can send to a port
+            - Only the owning Ractor can receive from it
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            port = Ractor::Port.new
+
+            ractor = Ractor.new(port) do |port|
+              port.send(:start)
+              Ractor.receive
+            end
+
+            port.receive # => :start
+            ractor.send(:end)
+            ractor.value # => :end
+            ```
+
+            Note:
+            - Here the Ractor tells us
+            - when it's ready to start
+            - And we tell it when to end
+            - Through sending and receiving symbols
+            - *Pause*
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            Ractor.shareable?(1)                   # => true
+            Ractor.shareable?(:symbol)             # => true
+            Ractor.shareable?(String)              # => true
+
+            Ractor.shareable?("foo")               # => false
+            Ractor.shareable?("foo".freeze)        # => true
+
+            Ractor.shareable?([Object.new].freeze) # => false
+            ```
+
+            Note:
+            - The most important concept in Ractors
+            - Is shareability
+            - Numbers, symbols, and modules are shareable
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            Ractor.shareable?(1)                   # => true
+            Ractor.shareable?(:symbol)             # => true
+            Ractor.shareable?(String)              # => true
+
+            Ractor.shareable?("foo")               # => false
+            Ractor.shareable?("foo".freeze)        # => true
+
+            Ractor.shareable?([Object.new].freeze) # => false
+            ```
+
+            Note:
+            - A string is not, unless frozen
+            - A frozen array holding a mutable object is not
+            - Shareable basically means deeply frozen
+            - And you can use shareable? to check
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            config = { hosts: ["a.example", "b.example"] }
+            Ractor.shareable?(config)   # => false
+
+            Ractor.make_shareable(config)
+
+            config.frozen?              # => true
+            config[:hosts].frozen?      # => true
+            config[:hosts][0].frozen?   # => true
+            ```
+
+            Note:
+            - Ractor.make_shareable walks an object graph
+            - Of an object you give it
+            - And freezes everything in it
+            - Or it raises an IsolationError if it can't
+            ---
+            ## What is a Ractor
+
+            ```rb[9-11]
+            config = { hosts: ["a.example", "b.example"] }
+            Ractor.shareable?(config)   # => false
+
+            Ractor.make_shareable(config)
+
+            config.frozen?              # => true
+            config[:hosts].frozen?      # => true
+            config[:hosts][0].frozen?   # => true
+            ```
+
+            Note:
+            - In this case, the config hash
+            - and the nested array
+            - Including each nested string
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            receiver = Ractor.new { Ractor.receive }
+            data = ["foo", "bar"]
+
+            receiver.send(data)
+            # copied: a deep clone of the unshareable parts
+            receiver.value
+
+            receiver = Ractor.new { Ractor.receive }
+            receiver.send(data, move: true)
+            # moved: `data` is now a Ractor::MovedObject
+            receiver.value
+            ```
+
+            Note:
+            - You can send a Ractor unshareable data
+            - Ruby will copy it for you automatically
+            - But you can move it via move: true
+            - The receiver Ractor gets the original
+            - And the sender loses access to it
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            GOOD = "good".freeze
+            BAD  = +"bad"
+
+            Ractor.new { GOOD }.value
+            # => "good"
+
+            Ractor.new { BAD }.value
+            # Ractor::RemoteError: thrown by remote Ractor.
+            #   cause: Ractor::IsolationError: can not access non-shareable objects
+            #   in constant Object::BAD by non-main Ractor
+            ```
+
+            Note:
+            - Constants follow the same rules
+            - A Ractor can read a constant
+            - Only if its value is shareable
+            - Otherwise you get an IsolationError
+            - Telling you about the non-shareable object
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            class Settings
+              class << self
+                attr_accessor :value
+              end
+            end
+
+            Settings.value = +"x"
+
+            Ractor.new { Settings.value }.value
+            # Ractor::RemoteError: thrown by remote Ractor.
+            #   cause: Ractor::IsolationError: can not get unshareable values from
+            #   instance variables of classes/modules from non-main Ractors
+            #   (@value from Settings)
+            ```
+
+            Note:
+            - Class level ivars are the same
+            - Classes are shareable
+            - But their ivars might not be
+            ---
+            ## What is a Ractor
+
+            ```rb[9-13]
+            class Settings
+              class << self
+                attr_accessor :value
+              end
+            end
+
+            Settings.value = +"x"
+
+            Ractor.new { Settings.value }.value
+            # Ractor::RemoteError: thrown by remote Ractor.
+            #   cause: Ractor::IsolationError: can not get unshareable values from
+            #   instance variables of classes/modules from non-main Ractors
+            #   (@value from Settings)
+            ```
+
+            Note:
+            - So in this case
+            - Referencing Settings in a Ractor fails
+            - Because the value ivar is mutable
+            - It is a mutable string
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            Ractor[:cache] = {}
+            Ractor[:cache] # => {}
+
+            Ractor.store_if_absent(:cache) { {} }
+            ```
+
+            Note:
+            - Like threads, Ractors also have storage
+            - Subscript syntax can be used like a hash
+            - While store_if_absent initializes a value once atomically
+            - Which is useful for per-Ractor caches
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            handler = Ractor.shareable_proc do |env|
+              [200, {}, ["ok"]]
+            end
+            Ractor.shareable?(handler) # => true
+
+            prefix = +"Draft: "
+            Ractor.shareable_proc { prefix }
+            # Ractor::IsolationError: cannot make a shareable Proc because it can
+            #   refer unshareable object "Draft: " from variable 'prefix'
+            ```
+
+            Note:
+            - There's also shareable procs and lambdas
+            - A regular proc isn't shareable
+            - It captures self and locals
+            - The shareable_proc method returns an isolated, shareable copy
+            - And raises if referenced variables are unshareable
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            Ractor.main? # => true
+
+            ractor = Ractor.new { Ractor.main? }
+            ractor.value # => false
+            ```
+
+            Note:
+            - I hinted at it, but
+            - You're actually using Ractors today
+            - And might not even know it
+            - If you're running Ruby 3 or later
+            - A Ruby process starts in a "main" Ractor
+            ---
+            ## What is a Ractor
+
+            ```rb[]
+            $requests = 0
+            $requests += 1 # allowed in the main Ractor
+
+            worker = Ractor.new { $requests += 1 }
+            Ractor.select(worker)
+            # Ractor::RemoteError: thrown by remote Ractor.
+            #   cause: Ractor::IsolationError: can not access global variable
+            #   $requests from non-main Ractor
+            ```
+
+            Note:
+            - And calling Ractor.new creates a non-main Ractor
+            - These Ractors can't read or write global variables
+            - The main Ractor can and will
+            ---
+            ## What is a Ractor
+
+            - Shareable objects cross Ractor boundaries
+            - Shareable means deeply frozen
+            - Unshareable objects can be copied or moved
+            - No unshareable constants or classes
+
+            Note:
+            - So, the rules of Ractors are:
+            - Only shareable objects cross Ractor boundaries
+            - Shareable means deeply frozen
+            - Unshareable objects can be copied or moved
+            - And Ractors can't touch unshareable constants
+            - *Pause*
+            ---
+            # Ractors vs Threads
+
+            Note:
+            - Now let's talk about why this is useful
+            - By comparing it to threads and processes
+            - Which was our only options before Ractors
+            ---
+            ## Ractors vs Threads
+
+            ```mermaid
+            flowchart TD
+                Process --> GVL
+                GVL --> T1[Thread 1]
+                GVL --> T2[Thread 2]
+                GVL --> T3[Thread 3]
+            ```
+
+            Note:
+            - This is a Ruby process with threads
+            - Every thread shares the Global VM Lock
+            - And so, only 1 thread executes Ruby at a time
+            - At least in CRuby
+            ---
+            ## Ractors vs Threads
+
+
+            ```mermaid
+            flowchart TD
+                Process --> GVL
+                GVL --> T1[Thread 1]
+                GVL --> T2[Thread 2]
+                GVL --> T3[Thread 3]
+            ```
+
+            Note:
+            - Threads give you concurrency
+            - Which is great for waiting on IO
+            - But for CPU bound work
+            - Threads take turns
+            - Because the GVL allows only one thread
+            - To execute Ruby at a time
+            ---
+            ## Ractors vs Threads
+
+            ```mermaid
+            flowchart TD
+                Process --> GVL
+                GVL --> T1[Thread 1]
+                GVL --> T2[Thread 2]
+                GVL --> T3[Thread 3]
+            ```
+
+            Note:
+            - In a threaded web server
+            - If one request is rendering a view
+            - The others wait for the GVL
+            - And server latency goes up
+            ---
+            ## Ractors vs Threads
+
+            ```mermaid
+            flowchart TD
+                Puma --> W1[Worker 1]
+                Puma --> W2[Worker 2]
+                W1 --> G1[GVL] --> T1[Threads]
+                W2 --> G2[GVL] --> T2[Threads]
+            ```
+
+            Note:
+            - Until now
+            - The workaround was forking
+            - Puma can fork workers into separate processes
+            - Each with its own memory and GVL
+            - With multiple processes, requests can run in parallel
+            ---
+            ## Ractors vs Threads
+
+            ```mermaid
+            flowchart TD
+                Puma --> W1[Worker 1]
+                Puma --> W2[Worker 2]
+                W1 --> G1[GVL] --> T1[Threads]
+                W2 --> G2[GVL] --> T2[Threads]
+            ```
+
+            Note:
+            - But every fork has a copy of your app
+            - Preloading helps with copy-on-write
+            - Workers start out sharing pages
+            - But as they run, memory diverges
+            - And overall footprint grows with each worker
+            ---
+            ## Ractors vs Threads
+
+            ```mermaid
+            flowchart TD
+                Process --> R1[Ractor 1] --> G1[GVL] --> T1[Threads]
+                Process --> R2[Ractor 2] --> G2[GVL] --> T2[Threads]
+                Process --> R3[Ractor 3] --> G3[GVL] --> T3[Threads]
+            ```
+
+            Note:
+            - Ractors are different
+            - One process
+            - But each Ractor has its own GVL
+            - So they run Ruby in parallel
+            - And share anything that's immutable
+            - Or copy it
+            ---
+            ## Ractors vs Threads
+
+            <iframe src="gvl_visualization.html" title="Threads vs Ractors" style="width:100%; height:560px; border:0;">
+            </iframe>
+
+            Note:
+            - Here's a visualization
+            - Four CPU bound requests on each side
+            - On the left, threads
+            - On the right, Ractors
+            - *Don't hit play*
+            ---
+            ## Ractors vs Threads
+
+            <iframe src="gvl_visualization.html" title="Threads vs Ractors" style="width:100%; height:560px; border:0;">
+            </iframe>
+
+            Note:
+            - Let's hit play
+            - As we can see, at execution time
+            - Threads take turns
+            - And Ractors don't
+            - That's the difference between
+            - Concurrency and parallelism
+            ---
+            ## Ractors vs Threads
+
+            |                | Process  | Thread     | Ractor         |
+            | -------------- | -------- | ---------- | -------------- |
+            | Parallel Ruby | Yes | No       | Yes            |
+            | Shares memory  | Copy-on-write | Everything | Shareable objects |
+            | Data races     | Impossible | Possible | Impossible     |
+            | Communication  | IPC      | Shared objects | Messages   |
+
+            Note:
+            - To sum it up
+            - Processes are parallel, but expensive in terms of memory
+            - Threads are cheap, but serialized for CPU-bound work
+            - Ractors are parallel, but often require code changes
+            - *Pause*
+            ---
+            # Ractors on Rails
+
+            Note:
+            - Speaking of code changes
+            - Ractor support has shipped on Rails edge
+            - It isn't quite done yet
+            - Let's take a look anyway
+            ---
+            ## Ractors on Rails
+
+            ```sh
+            rails new ractor_app \
+              --template https://tinyurl.com/ractor-template \
+              --skip-solid
+            cd ractor_app
+            bin/rails g scaffold user name:string
+            bin/rails db:migrate
+            bin/rails db:schema:cache:dump
+            bin/rails assets:precompile
+            bin/rails server
+            ```
+
+            Note:
+            - The first milestone was modest
+            - My team wanted to
+            - generate a new app
+            - Scaffold a resource
+            - And serve it from a Ractor
+            ---
+            ## Ractors on Rails
+
+            - Routing
+            - Controllers
+            - Views
+            - Translation
+            - Database queries
+            - Asset pipeline
+            - Active Support helpers
+
+            Note:
+            - It sounds easy
+            - But it isn't
+            - A scaffolded app touches a lot:
+            - Routing, requests, views, I18n
+            - The database, assets, Active Support
+            ---
+            ## Ractors on Rails
+
+            | Ractor Support PRs    |      |
+            | --------------------- | ---: |
+            | Closed                | 138 |
+            | Merged                | 133 |
+            | Contributors          | 16  |
+
+            Note:
+            - Here's the rough timeline:
+            - As of October, we have 138 closed PRs
+            - Related to Ractors
+            - 133 of them merged
+            - 16 contributors
+            ---
+            ## Ractors on Rails
+
+            | Month       | Merged PRs |
+            | ----------- | ---------: |
+            | May 2026    | 5          |
+            | June 2026   | 33         |
+            | July 2026   | 28         |
+            | August 2026 | 35         |
+            | Sept 2026   | 17         |
+            | October 2026 | 10         |
+
+            Note:
+            - Five PRs in May to start
+            - Then closer to 30 each month after
+            - Things are slowing a bit post project
+            - But established a lot of patterns in this work
+            - Let's walk through them next
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            module ActiveSupport
+              module Ractors
+                class << self
+                  def shareable?(obj)        = Ractor.shareable?(obj)
+                  def make_shareable(...)    = Ractor.make_shareable(...)
+                  def shareable_proc(...)    = Ractor.shareable_proc(...)
+                  def shareable_lambda(...)  = Ractor.shareable_lambda(...)
+                  def main?                  = Ractor.main?
+                end
+              end
+            end
+            ```
+
+            Note:
+            - The first was determining support
+            - Ruby 4 had the APIs we wanted
+            - And Rails still supported Ruby 3
+            - Which doesn't have usable Ractor APIs
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            module ActiveSupport
+              module Ractors
+                class << self
+                  def shareable?(obj)        = Ractor.shareable?(obj)
+                  def make_shareable(...)    = Ractor.make_shareable(...)
+                  def shareable_proc(...)    = Ractor.shareable_proc(...)
+                  def shareable_lambda(...)  = Ractor.shareable_lambda(...)
+                  def main?                  = Ractor.main?
+                end
+              end
+            end
+            ```
+
+            Note:
+            - This is where ActiveSupport::Ractors comes in
+            - Thin shims over the Ractor API
+            - On Ruby 4, they delegate to real Ractor APIs
+            - On older Rubies, it shims the behaviour
+            - This was a lot better than putting IFs everywhere
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            @list = {
+              long_ordinal: lambda { |time|
+                day_format = ActiveSupport::Inflector.ordinalize(time.day)
+                time.strftime("%B #{day_format}, %Y %H:%M")
+              },
+              rfc822: lambda { |time|
+                offset_format = time.formatted_offset(false)
+                time.strftime("%a, %d %b %Y %H:%M:%S #{offset_format}")
+              },
+              rfc2822: lambda { |time| time.rfc2822 },
+              iso8601: lambda { |time| time.iso8601 },
+            }.freeze
+            ```
+
+            Note:
+            - Here's an example
+            - `ActiveSupport::TimeFormats` keeps
+            - formatter lambdas in a hash
+            - Freezing the list hash is not enough:
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            @list = {
+              long_ordinal: ActiveSupport::Ractors.shareable_lambda { |time|
+                day_format = ActiveSupport::Inflector.ordinalize(time.day)
+                time.strftime("%B #{day_format}, %Y %H:%M")
+              },
+              rfc822: ActiveSupport::Ractors.shareable_lambda { |time|
+                offset_format = time.formatted_offset(false)
+                time.strftime("%a, %d %b %Y %H:%M:%S #{offset_format}")
+              },
+              rfc2822: ActiveSupport::Ractors.shareable_lambda { |time| time.rfc2822 },
+              iso8601: ActiveSupport::Ractors.shareable_lambda { |time| time.iso8601 },
+            }.freeze
+            ```
+
+            Note:
+            - The lambdas must be made shareable
+            - We can simply use ActiveSupport::Ractors
+            - to add Ractor support on Ruby 4
+            - And to no-op on older Rubies
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - Next we have Rails.application.ractorize!
+            - This is the method that
+            - Prepares a booted app for Ractors
+            - Let's walk through it
+            ---
+            ## Ractors on Rails
+
+            ```rb[2-4]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - First, it forces lazy values to compute
+            - Think environment config, app revision, route set
+            - In order to freeze the app
+            - Nothing can be lazily assigned
+            - So memoized values need to be calculated
+            ---
+            ## Ractors on Rails
+
+            ```rb[6]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - Next, we throw away autoloaders and reloaders
+            - They hold mutexes and mutable file arrays
+            - And once the app is booted
+            - These loaders aren't used anymore
+            - So we can safely remove them
+            ---
+            ## Ractors on Rails
+
+            ```rb[8-9]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - The before_ractorize hook lets each framework prepare its state
+            - Action View's template registries
+            - Active Support time zones
+            - Action Pack controller configs
+            - Active Record model reflections
+            - and so on
+            ---
+            ## Ractors on Rails
+
+            ```rb[11]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - Then the big one
+            - Make the application object itself shareable
+            - That deep freezes config, middleware, routes
+            - And so on
+            ---
+            ## Ractors on Rails
+
+            ```rb[13]
+            def ractorize!
+              env_config
+              revision
+              routes
+
+              @autoloaders, @reloaders, @routes_reloader = nil, nil, nil
+
+              ActiveSupport.run_load_hooks(:before_ractorize, self)
+              ActiveSupport::TimeZone.make_shareable!
+
+              Ractor.make_shareable(self)
+
+              require "rack/ractorize"
+            end
+            ```
+
+            Note:
+            - Finally it requires rack/ractorize
+            - Edge Rack now supports ractors
+            - All you have to do
+            - Is require this file, and it patches itself
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            # config/environments/production.rb
+
+            config.eager_load = true
+            config.logger = ActiveSupport::Ractors::Logger.new
+            config.cache_store = :null_store
+            config.action_cable.mount_path = nil
+            config.active_job.queue_adapter = :inline
+
+            ActiveSupport::Ractors.unshareable_proc_action = :raise
+            ```
+
+            Note:
+            - There are restrictions today
+            - Eager loading is mandatory
+            - You have to use a Ractor-safe logger
+            - And there's a few other configs to set
+            - This will be easier when Ractor support is released
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            test "jobs are performed from a non-main Ractor" do
+              app "production"
+
+              ractorize!
+
+              assert_ractor_shareable ActiveJob::Base.queue_adapter
+              assert_equal "Hello, worker", on_ractor do
+                HelloJob.perform_now("worker")
+              end
+            end
+            ```
+
+            Note:
+            - This is what tests look like
+            - Boot a production app, ractorize it
+            - Assert things are shareable
+            - Or runnable on a separate Ractor
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            sequenceDiagram
+                participant W as Worker Ractor
+                participant P as Proxy pool
+                participant M as Main Ractor
+                W->>P: Post.find(1)
+                P->>M: shareable query request
+                M->>M: run on a real connection
+                M-->>P: shareable query response
+                P-->>W: Active Record result
+            ```
+
+            Note:
+            - We also ractorized Active Record connection handling
+            - And database adapters are native extensions
+            - sqlite3, pg, trilogy, etc.
+            - None of them are Ractor shareable
+            - So how does a worker Ractor run a query?
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            sequenceDiagram
+                participant W as Worker Ractor
+                participant P as Proxy pool
+                participant M as Main Ractor
+                W->>P: Post.find(1)
+                P->>M: shareable query request
+                M->>M: run on a real connection
+                M-->>P: shareable query response
+                P-->>W: Active Record result
+            ```
+
+            Note:
+            - For now, it doesn't
+            - Queries on a non-main Ractor
+            - Are crafted and proxied to the main Ractor
+            - *Explain diagram*
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            sequenceDiagram
+                participant W as Worker Ractor
+                participant P as Proxy pool
+                participant M as Main Ractor
+                W->>P: Post.find(1)
+                P->>M: shareable query request
+                M->>M: run on a real connection
+                M-->>P: shareable query response
+                P-->>W: Active Record result
+            ```
+
+            Note:
+            - This works, but it isn't ideal long term
+            - If adapters were Ractor safe
+            - We wouldn't have to proxy queries
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            sequenceDiagram
+                participant W as Worker Ractor
+                participant P as Proxy pool
+                participant M as Main Ractor
+                W->>P: Post.find(1)
+                P->>M: shareable query request
+                M->>M: run on a real connection
+                M-->>P: shareable query response
+                P-->>W: Active Record result
+            ```
+
+            Note:
+            - But native extensions and Ractors
+            - Don't play nicely today
+            - And that's a topic for another talk
+            - *Pause*
+            ---
+            ## Ractors on Rails
+
+            ```rb[]
+            app = Ractor.shareable_proc do |env|
+              [200, { "content-type" => "text/plain" }, ["Hello from #{Ractor.current}"]]
+            end
+
+            Kino::Server.run(app, port: 9292)
+            ```
+
+            Note:
+            - You also need a Ractor friendly web server
+            - Kino is a Ractor web server for Ruby 4
+            - Made by my coworker Yaroslav at Shopify
+            - Let's take a closer look at it
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            flowchart LR
+                C[Client] --> S["Server"]
+                S --> P["Pool"]
+                P --> W1["Ractor worker 1<br/>Rails app"]
+                P --> W2["Ractor worker 2<br/>Rails app"]
+                P --> W3["Ractor worker N<br/>Rails app"]
+            ```
+
+            Note:
+            - This is how it works at a high level
+            - Clients interact with the app server
+            - It dispatches requests to a pool of Ractors
+            - A ractor picks up the request
+            ---
+            ## Ractors on Rails
+
+            ```mermaid
+            flowchart LR
+                C[Client] --> S["Server"]
+                S --> P["Pool"]
+                P --> W1["Ractor worker 1<br/>Rails app"]
+                P --> W2["Ractor worker 2<br/>Rails app"]
+                P --> W3["Ractor worker N<br/>Rails app"]
+            ```
+
+            Note:
+            - Today we have something similar
+            - But with worker processes
+            - So the architecture is similar
+            - Just using a different means of parallelism
+            ---
+            ## Ractors on Rails
+
+            - Autoload mode support
+            - Active Storage, Action Cable, Active Job, etc.
+            - Per-Ractor database connections
+            - Better Caching
+
+            Note:
+            - Basic Rails apps work today
+            - But there's a lot left to do
+            - Autoload support
+            - Storage, Cable, Job, and more
+            - Per-Ractor DB connections
+            - Caching across Ractors
+            ---
+            ## Ractors on Rails
+
+            <div class="video-reference">
+              <a class="video-reference__preview" href="https://www.youtube.com/watch?v=MVKUx-B_wHs" target="_blank" rel="noopener noreferrer"><img src="images/ractors-rails-robots-preview.jpg" alt="Video preview for Ractors, Rails, and Robots: Automating the Path to Ractor-safety"></a>
+              <a class="video-reference__qr" href="https://www.youtube.com/watch?v=MVKUx-B_wHs" target="_blank" rel="noopener noreferrer"><img src="images/ractors-rails-robots-qr.png" alt="QR code linking to Ractors, Rails, and Robots: Automating the Path to Ractor-safety"><span>Watch the talk</span></a>
+            </div>
+
+            Note:
+            - If you want to know more
+            - About how my team did this work
+            - My coworker Andrew talked about it at Rails World
+            - Feel free to scan the QR code on screen
+            - *Pause*
+            ---
+            ## Ractors on Rails
+
+            <div class="article-references">
+              <a class="article-reference" href="https://railsatscale.com/2026-09-16-ractor-age-rails-a-how-to-guide/" target="_blank" rel="noopener noreferrer">
+                <img src="images/ractor-age-rails-how-to-guide-qr.png" alt="QR code linking to Ractor-age Rails: A How-To Guide">
+                <span class="article-reference__title">Ractor-age Rails: A How-To Guide</span>
+                <span class="article-reference__author">Hartley McGuire</span>
+              </a>
+              <a class="article-reference" href="https://railsatscale.com/2026-08-11-ractors-on-rails/" target="_blank" rel="noopener noreferrer">
+                <img src="images/bringing-rails-ractor-age-qr.png" alt="QR code linking to Bringing Rails into the Ractor-age">
+                <span class="article-reference__title">Bringing Rails into the Ractor-age</span>
+                <span class="article-reference__author">Edouard Chin</span>
+              </a>
+            </div>
+            Note:
+            - Other folks from my team
+            - Edouard and Hartley wrote two
+            - Very insightful blog posts
+            - Both of which are viewable
+            - At these QR codes
+            - *Pause*
+            ---
+            ## Ractors on Rails
+
+            ![Potential memory savings: a Kino Ractor pool used nearly 7x less PSS than a Puma cluster at eight workers](images/memory_gain.png)
+
+            Note:
+            - To spoil one of the blog posts
+            - Early benchmarks show nearly 7x less
+            - memory used on a 8 worker config
+            - with Basecamp's Writebook app
+            - when compared to a traditional Puma cluster
+            - Which is pretty huge savings
+            - *Pause*
+            ---
+            # Conclusion
+
+            Note:
+            - So let's quickly recap
+            - What I talked about today
+            ---
+            ## Conclusion
+
+            ```rb[]
+            ractor = Ractor.new { 21 * 2 }
+
+            ractor.value # => 42
+            ```
+
+            Note:
+            - Ractors are isolated units of execution
+            - That communicate with messages
+            - And only share copied or deeply frozen objects
+            ---
+            ## Conclusion
+
+            ```mermaid
+            flowchart TD
+                Process --> R1[Ractor 1] --> G1[GVL] --> T1[Threads]
+                Process --> R2[Ractor 2] --> G2[GVL] --> T2[Threads]
+                Process --> R3[Ractor 3] --> G3[GVL] --> T3[Threads]
+            ```
+
+            Note:
+            - Each Ractor has its own GVL
+            - So unlike threads, they run Ruby in parallel
+            - And unlike forking, they do it in one process
+            ---
+            ## Conclusion
+
+            <div class="template-reference">
+              <pre><code class="language-sh">rails new ractor_app \
+  --template https://tinyurl.com/ractor-template \
+  --skip-solid
+cd ractor_app
+bin/rails g scaffold user name:string
+bin/rails db:migrate
+bin/rails db:schema:cache:dump
+bin/rails assets:precompile
+bin/rails server</code></pre>
+              <a class="template-reference__qr" href="https://gist.github.com/gmcgibbon/d4f6ad2a6a1fe63cee649587fe8ff7b8" target="_blank" rel="noopener noreferrer"><img src="images/ractor-template-qr.png" alt="QR code linking to the Ractor Rails app template"><span>Get the app template</span></a>
+            </div>
+
+            Note:
+            - Rails is getting there
+            - Over a hundred PRs have merged upstream
+            - A new app can be served on Ractors
+            - This script will do it for you
+            - *Pause*
+            ---
+            ## Ractor Contributors
+
+            <div class="ractor-contributors">
+              <div class="ractor-contributor"><a href="https://github.com/AIndrewn617"><img src="images/ractor-contributors/AIndrewn617.webp" alt="AIndrewn617">AIndrewn617</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/cam-woloshyn"><img src="images/ractor-contributors/cam-woloshyn.webp" alt="cam-woloshyn">cam-woloshyn</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/Edouard-chin"><img src="images/ractor-contributors/Edouard-chin.webp" alt="Edouard-chin">Edouard-chin</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/hmcguire-shopify"><img src="images/ractor-contributors/hmcguire-shopify.webp" alt="hmcguire-shopify">hmcguire-shopify</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/matthewd"><img src="images/ractor-contributors/matthewd.webp" alt="matthewd">matthewd</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/yaroslav-shopify"><img src="images/ractor-contributors/yaroslav-shopify.webp" alt="yaroslav-shopify">yaroslav-shopify</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/jhawthorn"><img src="images/ractor-contributors/jhawthorn.webp" alt="jhawthorn">jhawthorn</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/paracycle"><img src="images/ractor-contributors/paracycle.webp" alt="paracycle">paracycle</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/etiennebarrie"><img src="images/ractor-contributors/etiennebarrie.webp" alt="etiennebarrie">etiennebarrie</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/byroot"><img src="images/ractor-contributors/byroot.webp" alt="byroot">byroot</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/kamipo"><img src="images/ractor-contributors/kamipo.webp" alt="kamipo">kamipo</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/55728"><img src="images/ractor-contributors/55728.webp" alt="55728">55728</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/akashchamp"><img src="images/ractor-contributors/akashchamp.webp" alt="akashchamp">akashchamp</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/bensheldon"><img src="images/ractor-contributors/bensheldon.webp" alt="bensheldon">bensheldon</a></div>
+              <div class="ractor-contributor"><a href="https://github.com/mhenrixon"><img src="images/ractor-contributors/mhenrixon.webp" alt="mhenrixon">mhenrixon</a></div>
+            </div>
+
+            Note:
+            - Just wanted to thank contributors
+            - Most of these folks are my colleagues
+            - But the community is helping us too now
+            - You could be up here next
+            - See me after the talk if you're interested!
+            - *Pause*
+            ---
+            ![Repo QR Code](images/qr.png)
+
+            Note:
+            - That's it
+            - You can find the slides at this QR code
+            - Are there any questions?
+            - Thanks!
+            ---
+            ## Further Reading
+            - https://railsatscale.com/2026-08-11-ractors-on-rails/
+            - https://railsatscale.com/2026-09-16-ractor-age-rails-a-how-to-guide/
+            - https://github.com/rails/rails/pulls?q=label%3A%22Ractor+Support%22
+            - https://www.youtube.com/watch?v=MVKUx-B_wHs
+            - https://docs.ruby-lang.org/en/4.0/Ractor.html
+            - https://github.com/yaroslav/kino
+            - https://github.com/jhawthorn/ractor-dispatch
+            ---
+          </textarea>
+        </section>
+      </div>
+    </div>
+    <script type="module">
+      import Reveal from 'reveal.js'
+      import Markdown from 'reveal.js-markdown-plugin'
+      import Mermaid from 'reveal.js-mermaid-plugin'
+      import LaserPointer from 'reveal.js-laser-pointer-plugin'
+      import Highlight from 'reveal.js-highlight-plugin'
+      import Notes from 'reveal.js-notes-plugin'
+
+      const deck = new Reveal({
+        plugins: [
+          Markdown,
+          Mermaid,
+          Highlight,
+          LaserPointer,
+          Notes,
+        ]
+      })
+      deck.initialize({
+        transition: 'none',
+        center: false,
+        controls: false,
+        hash: true,
+        controlsBackArrows: 'hidden',
+        mermaid: {
+          theme: 'dark',
+          look: 'classic',
+          themeVariables: {
+            fontFamily: 'Inter, sans-serif',
+            primaryColor: '#1f2228',
+            primaryTextColor: '#f7f4f0',
+            primaryBorderColor: '#e34f52',
+            mainBkg: '#1f2228',
+            nodeBorder: '#e34f52',
+            nodeTextColor: '#f7f4f0',
+            lineColor: '#bdb8b2',
+            textColor: '#e6e3df',
+            edgeLabelBackground: '#16181d',
+            actorBkg: '#1f2228',
+            actorBorder: '#e34f52',
+            actorTextColor: '#f7f4f0',
+            actorLineColor: '#5a5d66',
+            signalColor: '#bdb8b2',
+            signalTextColor: '#e6e3df',
+            activationBkgColor: '#2a181b',
+            activationBorderColor: '#e34f52',
+            cScale0: '#3a2326',
+            cScale1: '#6e2d31',
+            cScale2: '#a53a3f',
+            cScale3: '#e34f52',
+            cScale4: '#f29496',
+            cScaleLabel4: '#0f1013',
+          },
+        },
+      })
+    </script>
+  </body>
+</html>

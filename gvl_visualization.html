@@ -1,0 +1,222 @@
+<style>
+  @import url(https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Sora:wght@700&family=JetBrains+Mono:wght@400;700&display=swap);
+
+  :root {
+    --bg: transparent;
+    --surface: #16181d;
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #e6e3df;
+    --muted: #9a9691;
+    --accent: #e34f52;
+    --running: #4cc38a;
+    --waiting: #d9a441;
+    --waiting-fill: #3a3d45;
+    --mono: "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  body {
+    margin: 0;
+    padding: 12px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, "Helvetica Neue", Helvetica, sans-serif;
+  }
+  .panes { display: flex; gap: 24px; }
+  .pane { flex: 1; }
+  .pane h3 {
+    margin: 0 0 4px;
+    font-family: Sora, Inter, sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .pane .sub { font-size: 17px; color: var(--muted); margin-bottom: 10px; min-height: 22px; }
+  .lane { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .lane .label { width: 90px; font-size: 18px; color: var(--text); font-family: var(--mono); }
+  .track {
+    flex: 1;
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.12s linear;
+  }
+  .lane.running .fill { background: var(--running); }
+  .lane.waiting .fill { background: var(--waiting-fill); }
+  .lane .state {
+    width: 80px;
+    font-size: 16px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .lane.running .state { color: var(--running); }
+  .lane.waiting .state { color: var(--waiting); }
+  .lane.done .state { color: var(--accent); }
+  .clock {
+    margin-top: 10px;
+    font-size: 20px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .clock b { color: var(--text); font-weight: 700; }
+  .controls { margin-top: 14px; display: flex; gap: 12px; align-items: center; }
+  button {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 6px 18px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  .legend { font-size: 16px; color: var(--muted); }
+  .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin: 0 4px 0 12px; vertical-align: -1px; }
+  .legend .running { background: var(--running); }
+  .legend .waiting { background: var(--waiting-fill); }
+  .legend .done { background: var(--accent); }
+</style>
+
+<div class="panes">
+  <div class="pane">
+    <h3>Threads</h3>
+    <div class="sub">One GVL &middot; one thread runs Ruby at a time</div>
+    <div id="threads"></div>
+    <div class="clock">Wall time: <b id="threads-clock">0.0s</b></div>
+  </div>
+  <div class="pane">
+    <h3>Ractors</h3>
+    <div class="sub">One GVL per Ractor &middot; all run at once</div>
+    <div id="ractors"></div>
+    <div class="clock">Wall time: <b id="ractors-clock">0.0s</b></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="play-btn" onclick="togglePlay()">Play</button>
+  <div class="legend">
+    <span class="running"></span>running
+    <span class="waiting"></span>waiting for GVL
+    <span class="done"></span>done
+  </div>
+</div>
+
+<script>
+const WORKERS = 4;          // requests / lanes per pane
+const WORK = 100;           // units of CPU work per request
+const TICK_MS = 60;         // real time per simulation tick
+const STEP = 2;             // work units completed per tick per running lane
+const SLICE = 10;           // ticks before the GVL moves to the next thread
+const TICK_SECONDS = 0.05;  // simulated seconds per tick
+
+const panes = {
+  threads: { el: document.getElementById('threads'), clock: document.getElementById('threads-clock'), lanes: [], ticks: 0, current: 0, slice: 0, finished: false },
+  ractors: { el: document.getElementById('ractors'), clock: document.getElementById('ractors-clock'), lanes: [], ticks: 0, finished: false },
+};
+
+const playBtn = document.getElementById('play-btn');
+let timer = null;
+let playing = false;
+
+function buildLanes(pane, prefix) {
+  pane.el.innerHTML = '';
+  pane.lanes = [];
+  for (let i = 0; i < WORKERS; i++) {
+    const row = document.createElement('div');
+    row.className = 'lane waiting';
+    row.innerHTML = `<div class="label">${prefix} ${i + 1}</div>
+      <div class="track"><div class="fill"></div></div>
+      <div class="state">waiting</div>`;
+    pane.el.appendChild(row);
+    pane.lanes.push({ row: row, fill: row.querySelector('.fill'), state: row.querySelector('.state'), done: 0 });
+  }
+}
+
+function setState(lane, state) {
+  lane.row.className = 'lane ' + state;
+  lane.state.textContent = state;
+}
+
+function advance(lane) {
+  lane.done = Math.min(WORK, lane.done + STEP);
+  lane.fill.style.width = lane.done + '%';
+  if (lane.done >= WORK) setState(lane, 'done');
+}
+
+function renderClock(pane) {
+  pane.clock.textContent = (pane.ticks * TICK_SECONDS).toFixed(1) + 's';
+}
+
+function tickThreads(pane) {
+  if (pane.finished) return;
+  const pending = pane.lanes.filter(l => l.done < WORK);
+  if (pending.length === 0) { pane.finished = true; return; }
+
+  // Hand the GVL to the next unfinished thread when the slice expires.
+  if (pane.lanes[pane.current].done >= WORK || pane.slice >= SLICE) {
+    pane.slice = 0;
+    do { pane.current = (pane.current + 1) % WORKERS; } while (pane.lanes[pane.current].done >= WORK);
+  }
+
+  pane.lanes.forEach((lane, i) => {
+    if (lane.done >= WORK) return;
+    if (i === pane.current) { setState(lane, 'running'); advance(lane); }
+    else setState(lane, 'waiting');
+  });
+
+  pane.slice++;
+  pane.ticks++;
+  renderClock(pane);
+}
+
+function tickRactors(pane) {
+  if (pane.finished) return;
+  const pending = pane.lanes.filter(l => l.done < WORK);
+  if (pending.length === 0) { pane.finished = true; return; }
+  pending.forEach(lane => { setState(lane, 'running'); advance(lane); });
+  pane.ticks++;
+  renderClock(pane);
+}
+
+function step() {
+  tickThreads(panes.threads);
+  tickRactors(panes.ractors);
+  if (panes.threads.finished && panes.ractors.finished) stopPlay();
+}
+
+function togglePlay() {
+  if (playing) { stopPlay(); return; }
+  if (panes.threads.finished && panes.ractors.finished) resetAll();
+  playing = true;
+  playBtn.textContent = 'Pause';
+  timer = setInterval(step, TICK_MS);
+}
+
+function stopPlay() {
+  playing = false;
+  playBtn.textContent = (panes.threads.finished && panes.ractors.finished) ? 'Replay' : 'Play';
+  clearInterval(timer);
+}
+
+function resetAll() {
+  stopPlay();
+  Object.values(panes).forEach(pane => {
+    pane.ticks = 0; pane.finished = false; pane.current = 0; pane.slice = 0;
+    renderClock(pane);
+  });
+  buildLanes(panes.threads, 'Thread');
+  buildLanes(panes.ractors, 'Ractor');
+  playBtn.textContent = 'Play';
+}
+
+resetAll();
+</script>
